@@ -1,0 +1,504 @@
+<!-- tasksApp/templates/index.html -->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Task Manager</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+
+        form {
+            margin-bottom: 20px;
+        }
+
+        input, textarea, select, button {
+            margin-bottom: 10px;
+            display: block;
+        }
+
+        button {
+            cursor: pointer;
+        }
+
+        .task-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        .task-buttons {
+            margin-top: 10px;
+        }
+
+        .update-form {
+            display: none;
+        }
+
+        .task-form {
+            display: none;
+        }
+        #logoutButton {
+            display: none;
+            position: absolute;
+            top: 10px;
+            right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <h1>TASK MANAGER</h1>
+
+    <div id="loginForm">
+        <h2>Login</h2>
+        <form>
+            <label for="username">Username:</label>
+            <input type="text" id="username" name="username" required>
+
+            <label for="password">Password:</label>
+            <input type="password" id="password" name="password" required>
+
+            <button type="button" onclick="login()">Login</button>
+        </form>
+    </div>
+
+    <button type="button" id="addTaskButton" style="display: none;" onclick="toggleCreateForm(true)">Add task to your to-do list</button>
+
+    <div id="taskForm" class="task-form">
+        <!-- Add your token input field here -->
+        <input type="hidden" id="token" name="token">
+
+        <label for="title">Title:</label>
+        <input type="text" id="title" name="title" required>
+
+        <label for="description">Description:</label>
+        <textarea id="description" name="description" required></textarea>
+
+        <label for="status">Status:</label>
+        <select id="status" name="status" required>
+            <option value="Pending">Pending</option>
+            <option value="Completed">Completed</option>
+        </select>
+        <input type="hidden" id="selectedTaskId" name="selectedTaskId">
+
+        <button type="button" onclick="createTask()">Submit Task</button>
+    </div>
+    <ul id="taskList" class="task-form"></ul>
+
+    <div id="updateForm" class="update-form task-form">
+        <h2>Update Task</h2>
+        <label for="updateTitle">Title:</label>
+        <input type="text" id="updateTitle" name="updateTitle" required>
+
+        <label for="updateDescription">Description:</label>
+        <textarea id="updateDescription" name="updateDescription" required></textarea>
+
+        <label for="updateStatus">Status:</label>
+        <select id="updateStatus" name="updateStatus" required>
+            <option value="Pending">Pending</option>
+            <option value="Completed">Completed</option>
+        </select>
+
+        <button type="button" onclick="submitUpdate()">Update</button>
+    </div>
+    <button type="button" id="logoutButton" onclick="logout()">Logout</button>
+
+    <script>
+        // Function to toggle the visibility of the "Add task" button
+        function toggleAddTaskButtonDisplay(isVisible) {
+            // Show the add task button after login
+            const addTaskButton = document.getElementById('addTaskButton');
+            addTaskButton.style.display = isVisible ? 'block' : 'none';
+        }
+
+        // Function to log in and obtain a token
+        function login() {
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+
+            fetch('http://127.0.0.1:8000/token/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    username: username,
+                    password: password,
+                }),
+            })
+            .then(response => {
+                if (response.status === 200) {
+                    return response.json();
+                } else {
+                    throw new Error('Invalid credentials');
+                }
+            })
+            .then(data => {
+                console.log('Success:', data);
+
+                // Store the token in local storage
+                localStorage.setItem('token', data.token);
+
+                // Set the token input field value
+                document.getElementById('token').value = data.token;
+
+                // Hide the login form after successful login
+                document.getElementById('loginForm').style.display = 'none';
+
+                // Show the task-related forms and headings
+                document.querySelectorAll('.task-form').forEach(element => {
+                    element.style.display = 'block';
+                });
+
+                // Show the "Add task" button after login
+                toggleAddTaskButtonDisplay(true);
+
+                // Fetch and display the task list
+                fetchTaskList();
+                toggleCreateForm(false);
+                toggleLogoutButton(true);
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+
+                // Show error message for invalid credentials
+                alert('Invalid credentials');
+            });
+        }
+
+        // Initial call to hide the "Add task" button when the page loads
+        document.addEventListener('DOMContentLoaded', function () {
+            toggleAddTaskButtonDisplay(false);
+
+            // Check for an existing token in local storage
+            const storedToken = localStorage.getItem('token');
+            if (storedToken) {
+                // Set the token input field value
+                document.getElementById('token').value = storedToken;
+
+                // Hide the login form
+                document.getElementById('loginForm').style.display = 'none';
+
+                // Show the task-related forms and headings
+                document.querySelectorAll('.task-form').forEach(element => {
+                    element.style.display = 'block';
+                });
+
+                // Show the "Add task" button
+                toggleAddTaskButtonDisplay(true);
+
+                // Fetch and display the task list
+                fetchTaskList();
+                toggleCreateForm(false);
+            }
+        });
+
+        // Function to toggle the visibility of the create task form
+        function toggleCreateForm(isVisible) {
+            const createForm = document.getElementById('taskForm');
+            createForm.style.display = isVisible ? 'block' : 'none';
+        }
+
+        // Function to create a new task
+        function createTask() {
+            const title = document.getElementById('title').value;
+            const description = document.getElementById('description').value;
+            const status = document.getElementById('status').value;
+
+            // Get the token from the input field
+            const token = document.getElementById('token').value;
+
+            fetch('http://127.0.0.1:8000/tasks/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`, // Include the token in the request header
+                },
+                body: JSON.stringify({
+                    title: title,
+                    description: description,
+                    status: status,
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Success:', data);
+                // Refresh the task list after creating a new task
+                fetchTaskList();
+                // Hide the create form after a task has been added
+                toggleCreateForm(false);
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+            });
+        }
+
+        // Function to fetch and display all tasks
+        function fetchTaskList() {
+    // Get the token from the input field
+    const token = document.getElementById('token').value;
+
+    fetch('http://127.0.0.1:8000/tasks/', {
+        headers: {
+            'Authorization': `Bearer ${token}`, // Include the token in the request header
+        },
+    })
+    .then(response => response.json())
+    .then(data => {
+        const taskList = document.getElementById('taskList');
+        taskList.innerHTML = ''; // Clear the existing list
+
+        if (data.length === 0) {
+            // If there are no tasks, hide both update and create forms
+            toggleUpdateFormVisibility(false);
+            toggleCreateForm(false);
+
+        } else {
+            data.forEach(task => {
+                if (!task || !task.id) {
+                    console.error('Invalid task object:', task);
+                    return; // Skip invalid tasks
+                }
+
+                const listItem = document.createElement('li');
+                listItem.className = 'task-item';
+
+                // Display task name and status in one line
+                listItem.textContent = `${task.title} - ${task.status}`;
+
+                // Add buttons for updating and deleting tasks
+                const buttonsContainer = document.createElement('div');
+                buttonsContainer.className = 'task-buttons';
+
+                const updateButton = document.createElement('button');
+                updateButton.textContent = 'Update';
+                updateButton.addEventListener('click', function () {
+                    openUpdateForm(task);
+                });
+                buttonsContainer.appendChild(updateButton);
+
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Delete';
+                deleteButton.onclick = () => deleteTask(task.id);
+                buttonsContainer.appendChild(deleteButton);
+
+                listItem.appendChild(buttonsContainer);
+
+                // Store the task ID in a data attribute
+                listItem.dataset.taskId = task.id;
+
+                taskList.appendChild(listItem);
+            });
+
+            // If there are tasks, hide only the create form
+            toggleCreateForm(false);
+                        toggleUpdateFormVisibility(false);
+
+        }
+    })
+    .catch((error) => {
+        console.error('Error:', error);
+    });
+}
+
+        // Function to toggle the visibility of the update form
+        function toggleUpdateFormVisibility(isVisible) {
+            const updateForm = document.getElementById('updateForm');
+            updateForm.style.display = isVisible ? 'block' : 'none';
+        }
+
+        function toggleUpdateFormVisibility(isVisible) {
+            const updateForm = document.getElementById('updateForm');
+            updateForm.style.display = isVisible ? 'block' : 'none';
+        }
+
+        // Function to open the update form with task details
+        function openUpdateForm(task) {
+            if (!task || !task.id) {
+                console.error('Invalid task object:', task);
+                return; // Skip if the task is invalid
+            }
+
+            toggleAddTaskButtonDisplay(false);
+            console.log('Opening update form for task:', task);
+            const taskId = task.id; // Get task ID directly from the object
+            console.log('Task ID:', taskId);
+            document.getElementById('updateTitle').value = task.title;
+            document.getElementById('updateDescription').value = task.description;
+            document.getElementById('updateStatus').value = task.status;
+
+            // Store the task ID in a variable or input field for later use
+            document.getElementById('selectedTaskId').value = taskId;
+
+            // Show the update form
+            toggleUpdateFormVisibility(true);
+
+            // Hide the task form
+            document.getElementById('taskForm').style.display = 'none';
+
+            // Hide the task list
+            document.getElementById('taskList').style.display = 'none';
+
+            // Hide the headings
+            document.querySelector('h1').style.display = 'none';
+            document.querySelector('h2').style.display = 'none';
+        }
+
+        // Function to submit the update form
+        function submitUpdate() {
+            const taskId = document.getElementById('selectedTaskId').value;
+
+            const title = document.getElementById('updateTitle').value;
+            const description = document.getElementById('updateDescription').value;
+            const status = document.getElementById('updateStatus').value;
+
+            // Get the token from the input field
+            const token = document.getElementById('token').value;
+
+            fetch(`http://127.0.0.1:8000/tasks/${taskId}/`, {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`, // Include the token in the request header
+                },
+                body: JSON.stringify({
+                    title: title,
+                    description: description,
+                    status: status,
+                }),
+            })
+            .then(response => response.json())
+            .then(data => {
+                console.log('Success:', data);
+                // Close the update form after updating a task
+                toggleUpdateFormVisibility(false);
+
+                // Show the task form
+                document.getElementById('taskForm').style.display = 'block';
+
+                // Show the task list
+                document.getElementById('taskList').style.display = 'block';
+
+                // Show the headings
+                document.querySelector('h1').style.display = 'block';
+                document.querySelector('h2').style.display = 'block';
+
+                // Refresh the task list after updating a task
+                fetchTaskList();
+                toggleAddTaskButtonDisplay(true);
+
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+            });
+        }
+
+        // Function to delete a task
+        function deleteTask(taskId) {
+            // Get the token from the input field
+            const token = document.getElementById('token').value;
+
+            fetch(`http://127.0.0.1:8000/tasks/${taskId}/`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`, // Include the token in the request header
+                },
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                // Check if the response has JSON content
+                const contentType = response.headers.get('content-type');
+                if (contentType && contentType.includes('application/json')) {
+                    return response.json();
+                } else {
+                    // Return a default value or handle the case where there's no JSON content
+                    return null;
+                }
+            })
+            .then(data => {
+                if (data !== null) {
+                    console.log('Success:', data);
+                }
+                // Refresh the task list after deleting a task
+                fetchTaskList();
+            })
+            .catch((error) => {
+                console.error('Error:', error);
+            });
+        }
+
+        // Initial fetch to load the task list
+        fetchTaskList();
+
+         // Function to show/hide the logout button based on login status
+        // Function to show/hide the logout button based on login status
+        function toggleLogoutButton(isLoggedIn) {
+            const logoutButton = document.getElementById('logoutButton');
+            logoutButton.style.display = isLoggedIn ? 'block' : 'none';
+        }
+
+        // Function to log out
+        function logout() {
+            // Clear the token from local storage
+            localStorage.removeItem('token');
+
+            // Hide the task-related forms and headings
+            document.querySelectorAll('.task-form').forEach(element => {
+                element.style.display = 'none';
+            });
+
+            // Show the login form
+            document.getElementById('loginForm').style.display = 'block';
+
+            // Hide the "Add task" button
+            toggleAddTaskButtonDisplay(false);
+
+            // Hide the logout button
+            toggleLogoutButton(false);
+
+            // Clear the task list
+            const taskList = document.getElementById('taskList');
+            taskList.innerHTML = '';
+
+            // Clear the input fields
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+        }
+
+        // Initial call to hide the logout button when the page loads
+        document.addEventListener('DOMContentLoaded', function () {
+            const token = localStorage.getItem('token');
+            const isLoggedIn = token !== null;
+
+            // Show/hide the logout button based on login status
+            toggleLogoutButton(isLoggedIn);
+
+            if (isLoggedIn) {
+                // Show the task-related forms and headings
+                document.querySelectorAll('.task-form').forEach(element => {
+                    element.style.display = 'block';
+                });
+
+                // Show the "Add task" button
+                toggleAddTaskButtonDisplay(true);
+
+                // Fetch and display the task list
+                fetchTaskList();
+            } else {
+                // Show the login form
+                document.getElementById('loginForm').style.display = 'block';
+            }
+        });
+        
+    </script>
+</body>
+</html>
