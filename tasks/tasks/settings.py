@@ -15,6 +15,12 @@ SECRET_KEY = 'django-insecure-)p7-)0j73(s(j23#(-=@&g_o89rd9mhmt)gzp8vb!)=#&6gb6g
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
+INTERNAL_IPS = [
+    # ...
+    "127.0.0.1",
+    # ...
+]
+
 ALLOWED_HOSTS = []
 
 # Application definition
@@ -29,6 +35,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework.authtoken',
     'tasksApp',
+    'debug_toolbar'
 ]
 # LOGIN_REDIRECT_URL = '/to_do_list/'  # Update this to your desired URL
 
@@ -40,6 +47,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'debug_toolbar.middleware.DebugToolbarMiddleware',
 ]
 
 ROOT_URLCONF = 'tasks.urls'

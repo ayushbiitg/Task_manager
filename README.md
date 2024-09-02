@@ -20,7 +20,7 @@ Task Manager is a web application built with Django for managing tasks.
 1 - Clone the repository
 
 2 - Navigate to the project directory:
-cd django_project/
+cd /django_task_manager
 
 3 - Create a virtual environment:
 python -m venv env
